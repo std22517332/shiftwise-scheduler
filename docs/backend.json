@@ -1,0 +1,307 @@
+{
+  "entities": {
+    "Employee": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Employee",
+      "type": "object",
+      "description": "Represents a staff member whose shifts are managed by the application, including their personal details, department, shift preferences, and experience level.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Employee entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the employee."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the employee."
+        },
+        "department": {
+          "type": "string",
+          "description": "The operational department or section the employee belongs to.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shiftTypePreference": {
+          "type": "string",
+          "description": "The preferred type of shift for the employee.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isSenior": {
+          "type": "boolean",
+          "description": "Indicates if the employee is considered senior (true) or junior (false) based on their experience."
+        },
+        "defaultOffDay": {
+          "type": "string",
+          "description": "The employee's preferred default day off in a week.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "department",
+        "shiftTypePreference",
+        "isSenior",
+        "defaultOffDay"
+      ]
+    },
+    "Holiday": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Holiday",
+      "type": "object",
+      "description": "Represents a specific date marked as a company holiday or a high-traffic special day, which influences shift scheduling constraints.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Holiday entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The specific date marked as a holiday or special day.",
+          "format": "date"
+        },
+        "type": {
+          "type": "string",
+          "description": "The classification of the special day, indicating its impact on scheduling.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description or name for the holiday/special day (e.g., 'New Year's Day', 'Peak Season Start')."
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "type"
+      ]
+    },
+    "Roster": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Roster",
+      "type": "object",
+      "description": "Represents a generated or manually adjusted staff schedule for a defined period, such as a week or a month. This entity serves as a record for historical schedules and upcoming plans.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Roster entity."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The starting date of the roster period.",
+          "format": "date"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The ending date of the roster period.",
+          "format": "date"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the roster, indicating its stage in the planning process.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "generatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when this roster was initially generated.",
+          "format": "date-time"
+        },
+        "lastModifiedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when this roster was last updated, either by a new generation or manual adjustment.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "startDate",
+        "endDate",
+        "status",
+        "generatedAt",
+        "lastModifiedAt"
+      ]
+    },
+    "Shift": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Shift",
+      "type": "object",
+      "description": "Represents a single assigned work shift or an off-day for an employee on a specific date within a particular roster.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Shift entity."
+        },
+        "rosterId": {
+          "type": "string",
+          "description": "Reference to the Roster this shift belongs to. (Relationship: Roster 1:N Shift)"
+        },
+        "employeeId": {
+          "type": "string",
+          "description": "Reference to the Employee assigned to this shift. (Relationship: Employee 1:N Shift)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The specific calendar date of the shift.",
+          "format": "date"
+        },
+        "shiftType": {
+          "type": "string",
+          "description": "The type of shift assigned for the day.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "startTime": {
+          "type": "string",
+          "description": "The scheduled start time of the shift. Not applicable for 'OffDay' type.",
+          "format": "time"
+        },
+        "endTime": {
+          "type": "string",
+          "description": "The scheduled end time of the shift. Not applicable for 'OffDay' type.",
+          "format": "time"
+        },
+        "isAdjusted": {
+          "type": "boolean",
+          "description": "Indicates if this shift was manually adjusted by a manager after its initial generation."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes or comments regarding this specific shift, such as reasons for adjustment or details about a swap."
+        }
+      },
+      "required": [
+        "id",
+        "rosterId",
+        "employeeId",
+        "date",
+        "shiftType",
+        "isAdjusted"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/roles_admin/{uid}",
+        "definition": {
+          "entityName": "admin",
+          "schema": {
+            "$ref": "#/backend/entities/admin"
+          },
+          "description": "This collection stores marker documents for users who hold the 'admin' role. The mere existence of a document at `/roles_admin/{uid}` grants administrative privileges, following the 'Existence over Content' DBAC principle.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The User ID (UID) of the Firebase Authentication user who is an administrator."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_manager/{uid}",
+        "definition": {
+          "entityName": "manager",
+          "schema": {
+            "$ref": "#/backend/entities/manager"
+          },
+          "description": "This collection stores marker documents for users who hold the 'manager' role. The existence of a document at `/roles_manager/{uid}` grants manager-level privileges, adhering to the 'Existence over Content' DBAC principle.",
+          "params": [
+            {
+              "name": "uid",
+              "description": "The User ID (UID) of the Firebase Authentication user who is a manager."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/employees/{employeeId}",
+        "definition": {
+          "entityName": "Employee",
+          "schema": {
+            "$ref": "#/backend/entities/Employee"
+          },
+          "description": "Stores individual employee profiles. Access is restricted to users with 'manager' or 'admin' roles. This collection follows Structural Segregation, ensuring all documents within share the same security posture.",
+          "params": [
+            {
+              "name": "employeeId",
+              "description": "The unique identifier for an employee."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/holidays/{holidayId}",
+        "definition": {
+          "entityName": "Holiday",
+          "schema": {
+            "$ref": "#/backend/entities/Holiday"
+          },
+          "description": "Stores definitions for company holidays and special high-traffic days. Access is restricted to users with 'manager' or 'admin' roles. This data influences shift scheduling constraints.",
+          "params": [
+            {
+              "name": "holidayId",
+              "description": "The unique identifier for a holiday or special day."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/rosters/{rosterId}",
+        "definition": {
+          "entityName": "Roster",
+          "schema": {
+            "$ref": "#/backend/entities/Roster"
+          },
+          "description": "Stores metadata for each generated or manually adjusted staff schedule (e.g., for a week). This entity's 'status' field ('DRAFT', 'PUBLISHED', 'ARCHIVED') manages its lifecycle and relevance for dashboard vs. history views. Access is restricted to users with 'manager' or 'admin' roles.",
+          "params": [
+            {
+              "name": "rosterId",
+              "description": "The unique identifier for a specific roster period."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/rosters/{rosterId}/shifts/{shiftId}",
+        "definition": {
+          "entityName": "Shift",
+          "schema": {
+            "$ref": "#/backend/entities/Shift"
+          },
+          "description": "Stores individual assigned work shifts or off-days. This is a subcollection of 'rosters', allowing for easy retrieval of all shifts for a specific roster. For Authorization Independence, each Shift document includes 'employeeId', enabling employees to securely access only their own shifts via collection group queries. Managers and Admins can access all shifts within a roster.",
+          "params": [
+            {
+              "name": "rosterId",
+              "description": "The unique identifier for the parent roster."
+            },
+            {
+              "name": "shiftId",
+              "description": "The unique identifier for an individual shift or off-day."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The proposed Firestore structure prioritizes Authorization Independence and Structural Segregation to ensure robust, debuggable security rules and efficient querying. The core strategy for Authorization Independence is to denormalize critical authorization fields directly into the documents that require access control based on those fields. For 'Shift' documents, the 'employeeId' field is denormalized, allowing employees to securely query and read only their own shifts without complex hierarchical checks.\n\nStructural Segregation is applied by ensuring that all documents within a given collection or subcollection share a homogeneous security posture. For example, all 'Employee' documents are in one collection, managed by authenticated 'managers' or 'admins'. Similarly, 'Holiday' data, 'Roster' metadata, and 'Shift' details are housed in their respective, logically segregated collections.\n\nQAPs (Query as Policy) are supported through this design:\n1.  **For Managers/Admins**: Managers, identified by their presence in `/roles_manager/{uid}` or `/roles_admin/{uid}`, have broad access to `employees`, `holidays`, and `rosters` collections, and to all `shifts` within any specific roster. This allows for listing all entities efficiently.\n2.  **For Employees**: Employees, identified by `request.auth.uid`, can perform collection group queries on `shifts`. By including `employeeId` directly in the `Shift` document, an employee can query `db.collectionGroup('shifts').where('employeeId', '==', request.auth.uid)`. The security rule for this query can simply be `allow list: if request.auth.uid == resource.data.employeeId;`, which is highly performant and secure, as it does not rely on `get()` calls to parent documents and allows direct filtering by the user's UID.\n\nThe `Roster` entity's `status` field (`DRAFT`, `PUBLISHED`, `ARCHIVED`) explicitly models the lifecycle of a schedule, eliminating the need for separate collections for different states and simplifying query logic for the dashboard (current/future) and history views (published/archived). Manual adjustments to a roster are reflected by updating the existing `Roster` and its child `Shift` documents, along with updating `lastModifiedAt`, ensuring that the single source of truth always represents the latest approved state, which then naturally reflects in 'history' views."
+  }
+}

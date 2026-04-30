@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 208 38% 95%; /* #ECF1F6 */
+    --foreground: 212 50% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 212 50% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 212 50% 15%;
+    --primary: 212 68% 39%; /* #1F5DA6 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 190 83% 64%; /* #59D4ED */
+    --secondary-foreground: 212 50% 15%;
+    --muted: 210 20% 90%;
+    --muted-foreground: 212 20% 45%;
+    --accent: 190 83% 94%;
+    --accent-foreground: 212 68% 39%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 212 68% 39%;
+    --radius: 0.75rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 212 50% 15%;
+    --sidebar-primary: 212 68% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 190 83% 94%;
+    --sidebar-accent-foreground: 212 68% 39%;
+    --sidebar-border: 210 20% 88%;
+    --sidebar-ring: 212 68% 39%;
+  }
+
+  .dark {
+    --background: 212 50% 10%;
+    --foreground: 0 0% 98%;
+    --card: 212 50% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 212 50% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 190 83% 64%;
+    --primary-foreground: 212 50% 10%;
+    --secondary: 212 68% 39%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 212 30% 20%;
+    --muted-foreground: 212 20% 65%;
+    --accent: 212 30% 25%;
+    --accent-foreground: 190 83% 64%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 212 30% 25%;
+    --input: 212 30% 25%;
+    --ring: 190 83% 64%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+@media print {
+  nav, button, .no-print, header, footer, .dropdown-menu {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .max-w-7xl {
+    max-width: 100% !important;
+  }
+
+  .week-container {
+    page-break-after: always;
+    border: 1px solid #eee !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    width: 100% !important;
+  }
+
+  .print-focus {
+    display: block !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  th, td {
+    border: 1px solid #ccc !important;
+    padding: 12px 4px !important;
+    font-size: 9pt !important;
+    text-align: center !important;
+  }
+
+  .bg-primary { background-color: #1F5DA6 !important; color: white !important; -webkit-print-color-adjust: exact; }
+  .bg-blue-900 { background-color: #1e3a8a !important; color: white !important; -webkit-print-color-adjust: exact; }
+  .bg-red-500 { background-color: #ef4444 !important; color: white !important; -webkit-print-color-adjust: exact; }
+  .bg-amber-400 { background-color: #fbbf24 !important; color: black !important; -webkit-print-color-adjust: exact; }
+  .bg-sky-100 { background-color: #e0f2fe !important; color: #075985 !important; -webkit-print-color-adjust: exact; }
+  
+  /* Force background colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

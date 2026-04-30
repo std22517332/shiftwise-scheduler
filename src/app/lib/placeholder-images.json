@@ -1,0 +1,16 @@
+{
+  "placeholderImages": [
+    {
+      "id": "hero-bg",
+      "description": "Professional planning office background",
+      "imageUrl": "https://picsum.photos/seed/shiftwise-hero/1200/400",
+      "imageHint": "office team planning"
+    },
+    {
+      "id": "staff-avatar",
+      "description": "User profile placeholder",
+      "imageUrl": "https://picsum.photos/seed/user/100/100",
+      "imageHint": "person avatar"
+    }
+  ]
+}

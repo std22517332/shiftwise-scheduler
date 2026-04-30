@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * SHIFTWISE PLANNER - PROTOTYPE SECURITY RULES
+     * 
+     * Broad permissions enabled for development.
+     * Allows any authenticated user (including anonymous admins)
+     * full access to all collections and documents.
+     * 
+     * DEPLOYMENT_TOKEN: 1740516135
+     */
+
+    // Simple wildcard match for all documents
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Explicit matches for root collections to ensure 'list' operations are caught
+    match /rosters/{rosterId} {
+      allow read, write: if request.auth != null;
+      
+      match /shifts/{shiftId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+
+    match /employees/{employeeId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /holidays/{holidayId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
