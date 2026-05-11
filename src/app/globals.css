@@ -10,26 +10,26 @@
     --card-foreground: 212 50% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 212 50% 15%;
-    --primary: 212 68% 39%; /* #1F5DA6 */
+    --primary: 186 67% 16%; /* #0E4046 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 190 83% 64%; /* #59D4ED */
-    --secondary-foreground: 212 50% 15%;
+    --secondary: 186 40% 90%;
+    --secondary-foreground: 186 67% 16%;
     --muted: 210 20% 90%;
     --muted-foreground: 212 20% 45%;
-    --accent: 190 83% 94%;
-    --accent-foreground: 212 68% 39%;
+    --accent: 186 45% 95%;
+    --accent-foreground: 186 67% 16%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 210 20% 88%;
     --input: 210 20% 88%;
-    --ring: 212 68% 39%;
+    --ring: 186 67% 16%;
     --radius: 0.75rem;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 212 50% 15%;
-    --sidebar-primary: 212 68% 39%;
+    --sidebar-primary: 186 67% 16%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 190 83% 94%;
-    --sidebar-accent-foreground: 212 68% 39%;
+    --sidebar-accent: 186 45% 95%;
+    --sidebar-accent-foreground: 186 67% 16%;
     --sidebar-border: 210 20% 88%;
     --sidebar-ring: 212 68% 39%;
   }
@@ -70,8 +70,22 @@
 }
 
 @media print {
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+
   nav, button, .no-print, header, footer, .dropdown-menu {
     display: none !important;
+  }
+
+  body[data-print-scope='single'] .week-container {
+    display: none !important;
+  }
+
+  body[data-print-scope='single'] .week-container.print-selected {
+    display: block !important;
+    page-break-after: auto !important;
   }
   
   .print-only {
@@ -99,8 +113,12 @@
     border: 1px solid #eee !important;
     box-shadow: none !important;
     margin: 0 !important;
-    padding: 20px !important;
+    padding: 8px !important;
     width: 100% !important;
+  }
+
+  .week-container .overflow-auto {
+    overflow: visible !important;
   }
 
   .print-focus {
@@ -113,14 +131,32 @@
     table-layout: fixed !important;
   }
 
+  thead {
+    display: table-header-group !important;
+  }
+
   th, td {
     border: 1px solid #ccc !important;
-    padding: 12px 4px !important;
-    font-size: 9pt !important;
+    padding: 6px 2px !important;
+    font-size: 8pt !important;
     text-align: center !important;
   }
 
-  .bg-primary { background-color: #1F5DA6 !important; color: white !important; -webkit-print-color-adjust: exact; }
+  .week-container .table-row,
+  .week-container tr {
+    height: auto !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  .week-container td > div {
+    min-height: 20px !important;
+    padding: 2px !important;
+    font-size: 7pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .bg-primary { background-color: #0E4046 !important; color: white !important; -webkit-print-color-adjust: exact; }
   .bg-blue-900 { background-color: #1e3a8a !important; color: white !important; -webkit-print-color-adjust: exact; }
   .bg-red-500 { background-color: #ef4444 !important; color: white !important; -webkit-print-color-adjust: exact; }
   .bg-amber-400 { background-color: #fbbf24 !important; color: black !important; -webkit-print-color-adjust: exact; }

@@ -1,138 +1,214 @@
-import React, { useState, useEffect } from 'react';
-import { getStore, updateHolidays, updateExtraPeakDays } from '@/lib/store';
+ 'use client';
+
+import React, { useMemo, useState, useEffect } from 'react';
+import { getStore, updateOccasions } from '@/lib/store';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, Plane, Plus, X } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarDays, Plus, X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { CalendarOccasion } from '@/lib/types';
 
 export function ConfigView() {
-  const [holidays, setHolidays] = useState<string[]>([]);
-  const [extraPeak, setExtraPeak] = useState<string[]>([]);
+  const { toast } = useToast();
+  const [occasions, setOccasions] = useState<CalendarOccasion[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [displayMonth, setDisplayMonth] = useState<Date>(new Date());
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [occasionTitle, setOccasionTitle] = useState('');
+  const [isHoliday, setIsHoliday] = useState(true);
 
   useEffect(() => {
     const store = getStore();
-    setHolidays(store.holidays);
-    setExtraPeak(store.extraPeakDays);
+    const initialOccasions = store.occasions || [];
+    setOccasions(initialOccasions);
+
+    if (initialOccasions.length > 0) {
+      const sorted = [...initialOccasions].sort((a, b) => a.date.localeCompare(b.date));
+      const firstDate = parseISO(sorted[0].date);
+      if (!Number.isNaN(firstDate.getTime())) {
+        setSelectedDate(firstDate);
+        setDisplayMonth(firstDate);
+      }
+    }
   }, []);
 
-  const addHoliday = () => {
+  const openEditor = () => {
     if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    if (holidays.includes(dateStr)) return;
-    const updated = [...holidays, dateStr];
-    setHolidays(updated);
-    updateHolidays(updated);
+    const existing = occasions.find((o) => o.date === dateStr);
+    setOccasionTitle(existing?.title || '');
+    setIsHoliday(existing?.isHoliday ?? true);
+    setIsEditorOpen(true);
   };
 
-  const addPeak = () => {
+  const handleDateSelect = (date: Date | undefined) => {
+    setSelectedDate(date);
+    if (!date) return;
+    setDisplayMonth(date);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const existing = occasions.find((o) => o.date === dateStr);
+    setOccasionTitle(existing?.title || '');
+    setIsHoliday(existing?.isHoliday ?? true);
+    setIsEditorOpen(true);
+  };
+
+  const saveOccasion = () => {
     if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    if (extraPeak.includes(dateStr)) return;
-    const updated = [...extraPeak, dateStr];
-    setExtraPeak(updated);
-    updateExtraPeakDays(updated);
-  };
+    const cleanTitle = occasionTitle.trim();
 
-  const removeDate = (date: string, type: 'holiday' | 'peak') => {
-    if (type === 'holiday') {
-      const updated = holidays.filter(d => d !== date);
-      setHolidays(updated);
-      updateHolidays(updated);
-    } else {
-      const updated = extraPeak.filter(d => d !== date);
-      setExtraPeak(updated);
-      updateExtraPeakDays(updated);
+    if (!cleanTitle) {
+      toast({ title: 'Title Required', description: 'Please enter the occasion title.', variant: 'destructive' });
+      return;
     }
+
+    const next = [
+      ...occasions.filter((o) => o.date !== dateStr),
+      { date: dateStr, title: cleanTitle, isHoliday },
+    ].sort((a, b) => a.date.localeCompare(b.date));
+
+    setOccasions(next);
+    updateOccasions(next);
+    setIsEditorOpen(false);
+    toast({ title: 'Saved', description: `${dateStr} saved successfully.` });
   };
+
+  const removeOccasion = (date: string) => {
+    const next = occasions.filter((o) => o.date !== date);
+    setOccasions(next);
+    updateOccasions(next);
+    toast({ title: 'Removed', description: `${date} removed.` });
+  };
+
+  const monthKey = useMemo(() => format(displayMonth, 'yyyy-MM'), [displayMonth]);
+  const monthOccasions = useMemo(() => occasions.filter((o) => o.date.startsWith(monthKey)).sort((a, b) => a.date.localeCompare(b.date)), [occasions, monthKey]);
+  const monthHolidayCount = monthOccasions.filter((o) => o.isHoliday).length;
+  const holidayDates = useMemo(() => occasions.filter((o) => o.isHoliday).map((o) => parseISO(o.date)), [occasions]);
+  const occasionDates = useMemo(() => occasions.map((o) => parseISO(o.date)), [occasions]);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-headline font-bold text-foreground">Scheduling Config</h2>
-          <p className="text-muted-foreground text-sm">Define holidays and seasonal traffic peaks.</p>
+          <h2 className="text-2xl font-headline font-bold text-foreground">Scheduling Calendar</h2>
+          <p className="text-muted-foreground text-sm">Navigate month-by-month, add occasions, and mark holiday days.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1 shadow-sm border-primary/10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="shadow-sm border-primary/10">
           <CardHeader>
-            <CardTitle className="text-lg">Date Picker</CardTitle>
-            <CardDescription>Select a date to define its status.</CardDescription>
+            <CardTitle className="text-lg">Calendar</CardTitle>
+            <CardDescription>Move to any month and select a day to register an occasion.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <Calendar
               mode="single"
               selected={selectedDate}
-              onSelect={setSelectedDate}
-              className="rounded-md border mx-auto"
+              month={displayMonth}
+              onMonthChange={setDisplayMonth}
+              onSelect={handleDateSelect}
+              onDayClick={(day) => handleDateSelect(day)}
+              className="rounded-md border mx-auto w-full"
+              modifiers={{ holiday: holidayDates, occasion: occasionDates }}
+              modifiersClassNames={{
+                holiday: 'bg-red-100 text-red-700 font-bold',
+                occasion: 'ring-1 ring-primary/40',
+              }}
             />
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <Button onClick={addHoliday} className="bg-primary gap-2">
-                <Plus className="w-4 h-4" /> Holiday
-              </Button>
-              <Button onClick={addPeak} variant="secondary" className="gap-2 bg-secondary text-primary">
-                <Plus className="w-4 h-4" /> Peak Day
-              </Button>
-            </div>
+            <Button onClick={openEditor} className="bg-primary gap-2">
+              <Plus className="w-4 h-4" /> Add / Edit Occasion
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Click on a day to open editor. Selected: {selectedDate ? format(selectedDate, 'yyyy-MM-dd') : 'None'}
+            </p>
           </CardContent>
         </Card>
 
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CalendarDays className="w-5 h-5 text-primary" /> Company Holidays
-                </CardTitle>
-                <CardDescription>Staff gain extra priority for off-days on these dates.</CardDescription>
-              </div>
-              <Badge className="bg-primary/10 text-primary border-primary/20">{holidays.length} Dates</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {holidays.length === 0 && <p className="text-sm text-muted-foreground italic">No holidays defined.</p>}
-                {holidays.map(date => (
-                  <Badge key={date} variant="outline" className="pl-3 pr-1 py-1 gap-2 border-primary/20 bg-primary/5">
-                    {date}
-                    <button onClick={() => removeDate(date, 'holiday')} className="p-0.5 hover:bg-primary/20 rounded-full">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Plane className="w-5 h-5 text-secondary" /> Extra Peak Traffic
-                </CardTitle>
-                <CardDescription>Reservation capacity is automatically maximized on these dates.</CardDescription>
-              </div>
-               <Badge variant="secondary" className="bg-secondary/10 text-primary border-secondary/20">{extraPeak.length} Dates</Badge>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {extraPeak.length === 0 && <p className="text-sm text-muted-foreground italic">No extra peak days defined.</p>}
-                {extraPeak.map(date => (
-                  <Badge key={date} variant="outline" className="pl-3 pr-1 py-1 gap-2 border-secondary/20 bg-secondary/5">
-                    {date}
-                    <button onClick={() => removeDate(date, 'peak')} className="p-0.5 hover:bg-secondary/20 rounded-full">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-primary" /> {monthKey} Summary
+              </CardTitle>
+              <CardDescription>Monthly occasions and holiday count.</CardDescription>
+            </div>
+            <Badge className="bg-primary/10 text-primary border-primary/20">
+              {monthHolidayCount === 0 ? 'No holidays' : `${monthHolidayCount} holiday day(s)`}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full overflow-x-auto rounded-xl border">
+              {monthOccasions.length === 0 && <p className="text-sm text-muted-foreground italic p-4">No occasions for this month.</p>}
+              {monthOccasions.length > 0 && (
+                <table className="w-full min-w-[460px] text-sm">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left px-3 py-2">Date</th>
+                      <th className="text-left px-3 py-2">Title</th>
+                      <th className="text-left px-3 py-2">Type</th>
+                      <th className="text-right px-3 py-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthOccasions.map((item) => (
+                      <tr key={item.date} className="border-t">
+                        <td className="px-3 py-2 font-medium">{item.date}</td>
+                        <td className="px-3 py-2">{item.title}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant={item.isHoliday ? 'destructive' : 'secondary'}>
+                            {item.isHoliday ? 'Holiday' : 'Occasion'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Button variant="ghost" size="icon" onClick={() => removeOccasion(item.date)} className="h-7 w-7">
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Occasion</DialogTitle>
+            <DialogDescription>
+              {selectedDate ? `Date: ${format(selectedDate, 'yyyy-MM-dd')}` : 'Select a date first.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="occasionTitle">Occasion Title</Label>
+              <Input id="occasionTitle" value={occasionTitle} onChange={(e) => setOccasionTitle(e.target.value)} placeholder="e.g. National holiday, team event" />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Mark as Holiday</p>
+                <p className="text-xs text-muted-foreground">Turn off for non-holiday occasions.</p>
+              </div>
+              <Switch checked={isHoliday} onCheckedChange={setIsHoliday} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditorOpen(false)}>Cancel</Button>
+            <Button onClick={saveOccasion}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

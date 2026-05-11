@@ -3,20 +3,34 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { format, parseISO } from 'date-fns';
+import { addMonths, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { Users, Clock, CalendarDays, Loader2 } from 'lucide-react';
+import { Users, Clock, CalendarDays, Loader2, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getStore } from '@/lib/store';
 
+type DashboardData = {
+  activeRoster: any;
+  history: any[];
+  holidays: string[];
+  extraPeakDays: string[];
+  occasions?: { date: string; title: string; isHoliday: boolean }[];
+};
+
 export function DashboardOverview() {
   const [mounted, setMounted] = useState(false);
-  const [data, setData] = useState<{ activeRoster: any, history: any[] }>({ activeRoster: null, history: [] });
+  const [data, setData] = useState<DashboardData>({ activeRoster: null, history: [], holidays: [], extraPeakDays: [] });
 
   useEffect(() => {
     setMounted(true);
     const store = getStore();
-    setData({ activeRoster: store.activeRoster, history: store.history });
+    setData({
+      activeRoster: store.activeRoster,
+      history: store.history,
+      holidays: store.holidays || [],
+      extraPeakDays: store.extraPeakDays || [],
+      occasions: store.occasions || [],
+    });
   }, []);
 
   const todayStr = useMemo(() => {
@@ -54,6 +68,32 @@ export function DashboardOverview() {
       off: todayShifts.filter((s: any) => s.shiftType === 'OFF' || s.shiftType.includes('OFF')).length,
     };
   }, [todayShifts]);
+
+  const holidayAlerts = useMemo(() => {
+    if (!mounted) return [] as { date: string; title: string; scope: 'current' | 'next' }[];
+    const today = new Date();
+    const currentMonthStart = startOfMonth(today);
+    const currentMonthEnd = endOfMonth(today);
+    const nextMonthStart = startOfMonth(addMonths(today, 1));
+    const nextMonthEnd = endOfMonth(addMonths(today, 1));
+
+    const allOccasions = data.occasions || [];
+    return allOccasions
+      .filter((o) => o.isHoliday)
+      .filter((o) => {
+        const d = parseISO(o.date);
+        if (Number.isNaN(d.getTime())) return false;
+        const inCurrentMonth = d >= currentMonthStart && d <= currentMonthEnd;
+        const inNextMonth = d >= nextMonthStart && d <= nextMonthEnd;
+        return inCurrentMonth || inNextMonth;
+      })
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((o) => {
+        const d = parseISO(o.date);
+        const scope = d >= currentMonthStart && d <= currentMonthEnd ? 'current' : 'next';
+        return { date: o.date, title: o.title, scope };
+      });
+  }, [data.occasions, mounted]);
 
   if (!mounted) {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
@@ -108,6 +148,30 @@ export function DashboardOverview() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="shadow-sm border-amber-200 bg-amber-50/40">
+        <CardHeader>
+          <CardTitle className="text-lg font-headline font-bold flex items-center gap-2">
+            <Bell className="w-5 h-5 text-amber-600" /> This Month Alerts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Holiday Notifications</p>
+            <div className="flex flex-wrap gap-2">
+              {holidayAlerts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No holiday notifications for current window.</p>
+              ) : (
+                holidayAlerts.map((item) => (
+                  <Badge key={`h-${item.date}`} variant="outline" className={item.scope === 'next' ? 'border-blue-300 text-blue-700' : ''}>
+                    {item.date} - {item.title} {item.scope === 'next' ? '(next month preview)' : ''}
+                  </Badge>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className="shadow-sm border-primary/5">

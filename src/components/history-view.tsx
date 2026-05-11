@@ -11,12 +11,7 @@ import { History, FileDown, ArrowLeftRight, ChevronDown, Check, Scale, RefreshCw
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -28,9 +23,18 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from '@/hooks/use-toast';
+import { RosterShiftMutationDropdownCell } from '@/components/roster-shift-mutation-cell';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const SHIFT_TYPES = ['Day', 'Night', 'OFF', 'H1-OFF', 'H2-OFF'];
 const DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const getShiftLabel = (type: string) => {
+  if (type === 'H1-OFF') return '8:30-13';
+  if (type === 'H2-OFF') return '13-18';
+  return type;
+};
 
 export function HistoryView() {
   const { toast } = useToast();
@@ -49,6 +53,7 @@ export function HistoryView() {
   const [syncWeekIdx, setSyncWeekIdx] = useState<number | null>(null);
   const [syncWarnings, setSyncWarnings] = useState<string[]>([]);
   const [isSyncOpen, setIsSyncOpen] = useState(false);
+  const [showMutationMetadata, setShowMutationMetadata] = useState(false);
 
   useEffect(() => {
     const store = getStore();
@@ -57,6 +62,31 @@ export function HistoryView() {
       setSelectedRoster(store.history[0]);
     }
   }, []);
+
+  const runPrint = (scope: 'all' | 'single', targetId?: string) => {
+    const previousScope = document.body.dataset.printScope;
+    const selectedBefore = Array.from(document.querySelectorAll('.week-container.print-selected'));
+    const targetEl = targetId ? document.getElementById(targetId) : null;
+
+    document.body.dataset.printScope = scope;
+    if (scope === 'single' && targetEl) {
+      targetEl.classList.add('print-selected');
+    }
+
+    const cleanup = () => {
+      if (targetEl) targetEl.classList.remove('print-selected');
+      selectedBefore.forEach((el) => el.classList.add('print-selected'));
+
+      if (previousScope) {
+        document.body.dataset.printScope = previousScope;
+      } else {
+        delete document.body.dataset.printScope;
+      }
+    };
+
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+  };
 
   const refreshData = () => {
     const store = getStore();
@@ -69,7 +99,14 @@ export function HistoryView() {
 
   const handleManualChange = (staffName: string, date: string, newType: string) => {
     if (!selectedRoster) return;
-    updateRosterShift(selectedRoster.id, date, staffName, newType);
+    const dayLabel =
+      selectedRoster.schedules.find((s: { date: string }) => s.date === date)?.dayOfWeek ?? date;
+    updateRosterShift(selectedRoster.id, date, staffName, newType, {
+      origin: 'manual_override',
+      actor: staffName,
+      relatedStaff: [staffName],
+      notes: `History archive — ${dayLabel} (${date})`,
+    });
     refreshData();
   };
 
@@ -177,9 +214,13 @@ export function HistoryView() {
     toast({ title: "Archive Updated", description: "Manual changes preserved in history." });
   };
 
-  const staffNames = useMemo(() => {
+  const staffNames = useMemo((): string[] => {
     if (!selectedRoster || selectedRoster.schedules.length === 0) return [];
-    return Array.from(new Set(selectedRoster.schedules[0].assignments.map((a: any) => a.staffName)));
+    return Array.from(
+      new Set(
+        selectedRoster.schedules[0].assignments.map((a: { staffName?: string }) => String(a.staffName ?? ''))
+      )
+    );
   }, [selectedRoster]);
 
   const weeks = useMemo(() => {
@@ -230,11 +271,18 @@ export function HistoryView() {
   };
 
   return (
+    <TooltipProvider delayDuration={280}>
     <div className="space-y-8 pb-20">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-headline font-bold text-foreground text-primary">History</h2>
           <p className="text-muted-foreground text-sm">Review and edit archived rosters.</p>
+        </div>
+        <div className="no-print flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
+          <Switch id="history-mutation-meta" checked={showMutationMetadata} onCheckedChange={setShowMutationMetadata} />
+          <Label htmlFor="history-mutation-meta" className="cursor-pointer text-xs font-medium text-muted-foreground">
+            Show mutation metadata
+          </Label>
         </div>
       </div>
 
@@ -261,7 +309,7 @@ export function HistoryView() {
 
         <div className="lg:col-span-3 space-y-6">
           {selectedRoster && weeks.map((weekDates, wIdx) => (
-            <div key={wIdx} className="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6 week-container">
+            <div key={wIdx} id={`history-${selectedRoster.id}-week-${wIdx}`} className="bg-white rounded-2xl border shadow-sm overflow-hidden mb-6 week-container">
               <div className="p-3 bg-muted/20 border-b flex justify-between items-center no-print">
                 <div className="flex items-center gap-4">
                   <span className="text-xs font-bold text-primary uppercase tracking-wider">Week {wIdx + 1}</span>
@@ -274,7 +322,12 @@ export function HistoryView() {
                     <RefreshCw className="w-3 h-3 mr-1" /> Update Archive
                   </Button>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => window.print()} className="h-7 text-[10px]">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => runPrint('single', `history-${selectedRoster.id}-week-${wIdx}`)}
+                  className="h-7 text-[10px]"
+                >
                   <FileDown className="w-3 h-3 mr-1" /> PDF
                 </Button>
               </div>
@@ -300,23 +353,24 @@ export function HistoryView() {
                         const type = assignment?.shiftType || 'Day';
                         return (
                           <TableCell key={date} className="p-1.5 text-center border-r">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <div className={cn(
-                                  "flex items-center justify-center p-1 rounded border text-[9px] font-bold min-h-[36px] cursor-pointer relative",
-                                  getShiftStyles(type)
-                                )}>
-                                  <span>{type}</span>
-                                </div>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                {SHIFT_TYPES.map(st => (
-                                  <DropdownMenuItem key={st} onClick={() => handleManualChange(name, date, st)}>
-                                    {st}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <RosterShiftMutationDropdownCell
+                              assignment={assignment}
+                              showMutationMeta={showMutationMetadata}
+                              triggerClassName={cn(
+                                'flex min-h-[36px] cursor-pointer items-center justify-center rounded border p-1 text-[9px] font-bold',
+                                getShiftStyles(type)
+                              )}
+                              shiftLabel={getShiftLabel(type)}
+                              menuContent={
+                                <DropdownMenuContent>
+                                  {SHIFT_TYPES.map((st) => (
+                                    <DropdownMenuItem key={st} onClick={() => handleManualChange(name, date, st)}>
+                                      {getShiftLabel(st)}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              }
+                            />
                           </TableCell>
                         );
                       })}
@@ -394,5 +448,6 @@ export function HistoryView() {
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }

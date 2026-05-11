@@ -1,21 +1,22 @@
 
-import { Staff, RosterStore, RosterPeriod } from './types';
+import { Staff, RosterStore, RosterPeriod, CalendarOccasion } from './types';
 import { DailySchedule } from '@/ai/flows/generate-staff-roster-flow';
+import {
+  attachShiftMutationMeta,
+  createMutationId,
+  createShiftMutationMeta,
+  logRosterMutation,
+  type AssignmentWithMutationMeta,
+  type ShiftMutationMetaDraft,
+} from './roster-mutation-meta';
 
 const STORAGE_KEY = 'shiftwise_v15_local_db';
 
 const DEFAULT_DATA: RosterStore = {
-  staff: [
-    { id: '1', name: 'Ali Rezayi', department: 'Reservation', shiftPreference: 'Day', isSenior: true, defaultOffDay: 'Monday', role: 'FixedDay' },
-    { id: '2', name: 'Sara Mohammadi', department: 'Reservation', shiftPreference: 'Night', isSenior: true, defaultOffDay: 'Tuesday', role: 'FixedNight' },
-    { id: '3', name: 'Hassan Alavi', department: 'Reservation', shiftPreference: 'Rotational', isSenior: false, defaultOffDay: 'Wednesday', role: 'Rotational' },
-    { id: '4', name: 'Maryam Rad', department: 'Reservation', shiftPreference: 'Rotational', isSenior: false, defaultOffDay: 'Thursday', role: 'Rotational' },
-    { id: '5', name: 'Reza Karimi', department: 'Reservation', shiftPreference: 'Rotational', isSenior: false, defaultOffDay: 'Friday', role: 'Rotational' },
-    { id: '6', name: 'Fatemeh Zahra', department: 'Reservation', shiftPreference: 'Rotational', isSenior: false, defaultOffDay: 'Saturday', role: 'Rotational' },
-    { id: '7', name: 'Babak Zanjani', department: 'Reservation', shiftPreference: 'Rotational', isSenior: false, defaultOffDay: 'Sunday', role: 'Rotational' },
-  ],
+  staff: [],
   holidays: [],
   extraPeakDays: [],
+  occasions: [],
   activeRoster: null,
   history: [],
 };
@@ -26,7 +27,37 @@ export function getStore(): RosterStore {
   if (!stored) return DEFAULT_DATA;
   try {
     const parsed = JSON.parse(stored);
+    let hasMigration = false;
     if (!parsed.history) parsed.history = [];
+    if (!parsed.holidays) parsed.holidays = [];
+    if (!parsed.extraPeakDays) parsed.extraPeakDays = [];
+    if (!parsed.occasions) parsed.occasions = [];
+    if (!parsed.staff) parsed.staff = [];
+
+    parsed.staff = parsed.staff.map((member: Staff) => {
+      if (member.weeklyOffDays === 1 || member.weeklyOffDays === 1.5) return member;
+      hasMigration = true;
+      return {
+        ...member,
+        weeklyOffDays: member.department === 'Housekeeping' ? 1 : 1.5,
+      };
+    });
+
+    // Backward compatibility: older data may only have `holidays`.
+    // Migrate those dates into `occasions` so Config and Dashboard stay in sync.
+    if (parsed.occasions.length === 0 && parsed.holidays.length > 0) {
+      parsed.occasions = parsed.holidays.map((date: string) => ({
+        date,
+        title: 'Holiday',
+        isHoliday: true,
+      }));
+      hasMigration = true;
+    }
+
+    if (hasMigration) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    }
+
     return parsed;
   } catch (e) {
     return DEFAULT_DATA;
@@ -56,6 +87,13 @@ export function updateExtraPeakDays(extra: string[]) {
   saveStore(store);
 }
 
+export function updateOccasions(occasions: CalendarOccasion[]) {
+  const store = getStore();
+  store.occasions = occasions;
+  store.holidays = occasions.filter((o) => o.isHoliday).map((o) => o.date);
+  saveStore(store);
+}
+
 export function saveActiveRoster(roster: RosterPeriod) {
   const store = getStore();
   store.activeRoster = roster;
@@ -72,31 +110,63 @@ export function archiveCurrentRoster() {
   }
 }
 
-export function updateRosterShift(rosterId: string, date: string, staffName: string, newType: any) {
+function applyShiftUpdateWithMeta(
+  schedules: DailySchedule[],
+  dayIdx: number,
+  assignIdx: number,
+  newType: unknown,
+  staffName: string,
+  mutationDraft?: ShiftMutationMetaDraft
+) {
+  const cell = schedules[dayIdx].assignments[assignIdx] as AssignmentWithMutationMeta;
+  cell.shiftType = newType as AssignmentWithMutationMeta['shiftType'];
+  const draft: ShiftMutationMetaDraft = mutationDraft ?? {
+    origin: 'manual_override',
+    actor: staffName,
+    relatedStaff: [staffName],
+    notes: 'Shift cell update (table or history)',
+  };
+  const meta = createShiftMutationMeta({
+    ...draft,
+    actor: draft.actor ?? staffName,
+    relatedStaff: draft.relatedStaff ?? [staffName],
+  });
+  attachShiftMutationMeta(cell, meta);
+}
+
+export function updateRosterShift(
+  rosterId: string,
+  date: string,
+  staffName: string,
+  newType: any,
+  mutationDraft?: ShiftMutationMetaDraft
+) {
   const store = getStore();
-  
+
   if (store.activeRoster?.id === rosterId) {
-    const dayIdx = store.activeRoster.schedules.findIndex(s => s.date === date);
+    const dayIdx = store.activeRoster.schedules.findIndex((s) => s.date === date);
     if (dayIdx !== -1) {
-      const assignIdx = store.activeRoster.schedules[dayIdx].assignments.findIndex(a => a.staffName === staffName);
+      const assignIdx = store.activeRoster.schedules[dayIdx].assignments.findIndex((a) => a.staffName === staffName);
       if (assignIdx !== -1) {
-        store.activeRoster.schedules[dayIdx].assignments[assignIdx].shiftType = newType;
+        applyShiftUpdateWithMeta(store.activeRoster.schedules, dayIdx, assignIdx, newType, staffName, mutationDraft);
         store.activeRoster.lastModifiedAt = new Date().toISOString();
         saveStore(store);
+        logRosterMutation('updateRosterShift', { rosterId, date, staffName, origin: mutationDraft?.origin ?? 'manual_override' });
         return;
       }
     }
   }
 
-  const historyIdx = store.history.findIndex(h => h.id === rosterId);
+  const historyIdx = store.history.findIndex((h) => h.id === rosterId);
   if (historyIdx !== -1) {
-    const dayIdx = store.history[historyIdx].schedules.findIndex(s => s.date === date);
+    const dayIdx = store.history[historyIdx].schedules.findIndex((s) => s.date === date);
     if (dayIdx !== -1) {
-      const assignIdx = store.history[historyIdx].schedules[dayIdx].assignments.findIndex(a => a.staffName === staffName);
+      const assignIdx = store.history[historyIdx].schedules[dayIdx].assignments.findIndex((a) => a.staffName === staffName);
       if (assignIdx !== -1) {
-        store.history[historyIdx].schedules[dayIdx].assignments[assignIdx].shiftType = newType;
+        applyShiftUpdateWithMeta(store.history[historyIdx].schedules, dayIdx, assignIdx, newType, staffName, mutationDraft);
         store.history[historyIdx].lastModifiedAt = new Date().toISOString();
         saveStore(store);
+        logRosterMutation('updateRosterShift', { rosterId, date, staffName, history: true, origin: mutationDraft?.origin ?? 'manual_override' });
       }
     }
   }
@@ -109,36 +179,63 @@ export function swapWeeklyPatterns(rosterId: string, weekDates: string[], staffA
   
   if (!staffA || !staffB) return;
 
+  const swapPair = [staffAName, staffBName];
+  const linkedPatternId = createMutationId();
+  const swapTs = new Date().toISOString();
+
   const applySwap = (roster: RosterPeriod) => {
-    weekDates.forEach(date => {
-      const dayIdx = roster.schedules.findIndex(s => s.date === date);
+    weekDates.forEach((date) => {
+      const dayIdx = roster.schedules.findIndex((s) => s.date === date);
       if (dayIdx !== -1) {
         const schedule = roster.schedules[dayIdx];
-        const idxA = schedule.assignments.findIndex(a => a.staffName === staffAName);
-        const idxB = schedule.assignments.findIndex(a => a.staffName === staffBName);
-        
+        const idxA = schedule.assignments.findIndex((a) => a.staffName === staffAName);
+        const idxB = schedule.assignments.findIndex((a) => a.staffName === staffBName);
+
         if (idxA !== -1 && idxB !== -1) {
           let typeA = schedule.assignments[idxA].shiftType;
           let typeB = schedule.assignments[idxB].shiftType;
 
-          // Swap logic with FixedDay protection
-          let nextA = typeB;
-          let nextB = typeA;
+          // Swap logic with FixedDay protection (local roster uses Day/Night/OFF/H*; widen for TS)
+          let nextA: unknown = typeB;
+          let nextB: unknown = typeA;
 
           if (staffA.shiftPreference === 'Day' && staffB.shiftPreference !== 'Day') {
-            if (nextA.includes('Night')) {
+            if (String(nextA).includes('Night')) {
               nextA = 'Day'; // Keep Ali on Day
               nextB = 'Night'; // Keep Rotational on Night
             }
           } else if (staffB.shiftPreference === 'Day' && staffA.shiftPreference !== 'Day') {
-            if (nextB.includes('Night')) {
+            if (String(nextB).includes('Night')) {
               nextB = 'Day';
               nextA = 'Night';
             }
           }
 
-          schedule.assignments[idxA].shiftType = nextA as any;
-          schedule.assignments[idxB].shiftType = nextB as any;
+          const cellA = schedule.assignments[idxA] as AssignmentWithMutationMeta;
+          const cellB = schedule.assignments[idxB] as AssignmentWithMutationMeta;
+          cellA.shiftType = nextA as AssignmentWithMutationMeta['shiftType'];
+          cellB.shiftType = nextB as AssignmentWithMutationMeta['shiftType'];
+
+          attachShiftMutationMeta(
+            cellA,
+            createShiftMutationMeta({
+              origin: 'pattern_swap',
+              timestamp: swapTs,
+              linkedPatternId,
+              relatedStaff: swapPair,
+              notes: `Pattern swap with ${staffBName} (${date})`,
+            })
+          );
+          attachShiftMutationMeta(
+            cellB,
+            createShiftMutationMeta({
+              origin: 'pattern_swap',
+              timestamp: swapTs,
+              linkedPatternId,
+              relatedStaff: swapPair,
+              notes: `Pattern swap with ${staffAName} (${date})`,
+            })
+          );
         }
       }
     });
@@ -148,11 +245,13 @@ export function swapWeeklyPatterns(rosterId: string, weekDates: string[], staffA
   if (store.activeRoster?.id === rosterId) {
     applySwap(store.activeRoster);
     saveStore(store);
+    logRosterMutation('swapWeeklyPatterns', { rosterId, linkedPatternId, staff: swapPair });
   } else {
-    const historyIdx = store.history.findIndex(h => h.id === rosterId);
+    const historyIdx = store.history.findIndex((h) => h.id === rosterId);
     if (historyIdx !== -1) {
       applySwap(store.history[historyIdx]);
       saveStore(store);
+      logRosterMutation('swapWeeklyPatterns', { rosterId, linkedPatternId, staff: swapPair, history: true });
     }
   }
 }
@@ -183,6 +282,7 @@ export function resetSchedulingData(options: { resetEmployees: boolean; resetCon
   if (options.resetConfig) {
     store.holidays = [];
     store.extraPeakDays = [];
+    store.occasions = [];
   }
   saveStore(store);
 }

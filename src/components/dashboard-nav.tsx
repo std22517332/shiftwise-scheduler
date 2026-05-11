@@ -1,5 +1,6 @@
 import { Calendar, Users, Settings, BarChart3, Info, History, LayoutDashboard, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 export type NavItem = 'dashboard' | 'roster' | 'staff' | 'history' | 'fairness' | 'settings' | 'data';
 
@@ -9,10 +10,14 @@ interface DashboardNavProps {
 }
 
 const NLCLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-primary shrink-0">
-    <path d="M2 20L8 6L13 16L17 8L22 20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <circle cx="18" cy="4" r="2" fill="currentColor"/>
-  </svg>
+  <Image
+    src="/branding/Asset-2.png"
+    alt="NorthernLAND Holiday Rentals"
+    width={982}
+    height={280}
+    priority
+    className="w-full h-auto"
+  />
 );
 
 export function DashboardNav({ active, onSelect }: DashboardNavProps) {
@@ -27,12 +32,10 @@ export function DashboardNav({ active, onSelect }: DashboardNavProps) {
   ];
 
   return (
-    <nav className="flex flex-col gap-2 p-4 bg-white border-r h-screen w-64 no-print">
-      <div className="flex items-center gap-3 px-2 mb-8 mt-2">
-        <NLCLogo />
-        <div>
-          <h1 className="font-headline font-bold text-lg text-primary tracking-tight">NLC Employee</h1>
-          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Planner v1.0</p>
+    <nav className="sticky top-0 self-start flex flex-col gap-2 p-4 bg-white border-r h-screen w-64 shrink-0 overflow-y-auto no-print">
+      <div className="flex flex-col items-center px-2 mb-6 mt-2">
+        <div className="w-full max-w-[220px]">
+          <NLCLogo />
         </div>
       </div>
       

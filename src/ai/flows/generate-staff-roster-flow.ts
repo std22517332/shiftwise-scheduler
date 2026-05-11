@@ -13,8 +13,8 @@ import {z} from 'genkit';
 // Define Staff Profile Schema
 const StaffProfileSchema = z.object({
   name: z.string().describe('The full name of the staff member.'),
-  department: z.enum(['Reservation', 'QualityControl', 'Contracts']).describe('The department the staff member belongs to.'),
-  shiftPreference: z.enum(['Day', 'Night', 'Rotational']).describe('The preferred general shift type for the staff member.'),
+  department: z.enum(['Reservation', 'QualityControl', 'Contracts', 'Housekeeping']).describe('The department the staff member belongs to.'),
+  shiftPreference: z.enum(['Day', 'Night', 'Rotational', 'StudentFixed']).describe('The preferred general shift type for the staff member.'),
   isSenior: z.boolean().describe('True if the staff member is senior, false if junior.'),
   defaultOffDay: z.string().optional().describe('The preferred default day of the week for a full day off (e.g., "Monday", "Sunday").'),
 });
@@ -33,7 +33,7 @@ export type GenerateStaffRosterInput = z.infer<typeof GenerateStaffRosterInputSc
 // Define individual shift assignment
 const ShiftAssignmentSchema = z.object({
   staffName: z.string().describe('The name of the staff member assigned to this shift.'),
-  department: z.enum(['Reservation', 'QualityControl', 'Contracts']).describe('The department of the staff member.'),
+  department: z.enum(['Reservation', 'QualityControl', 'Contracts', 'Housekeeping']).describe('The department of the staff member.'),
   isSenior: z.boolean().describe('Whether the staff member is senior.'),
   shiftType: z.enum(['DayShift', 'NightShift', 'FullDayOff', 'HalfDayOffMorning', 'HalfDayOffAfternoon']).describe(
     'The type of activity assigned for the day. ' +

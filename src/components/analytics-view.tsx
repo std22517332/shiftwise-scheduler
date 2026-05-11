@@ -123,7 +123,13 @@ export function AnalyticsView() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
+                <XAxis
+                  dataKey="name"
+                  interval={0}
+                  angle={-25}
+                  textAnchor="end"
+                  height={60}
+                />
                 <YAxis />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #eee' }} 
@@ -144,7 +150,13 @@ export function AnalyticsView() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" />
+                <XAxis
+                  dataKey="name"
+                  interval={0}
+                  angle={-25}
+                  textAnchor="end"
+                  height={60}
+                />
                 <YAxis />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #eee' }}
